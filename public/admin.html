@@ -75,6 +75,8 @@
         let lastMsgId = 0;
         let msgsInterval;
         let pendingFile = null;
+        let isPollingMsgs = false;          // prevent concurrent poll calls
+        const displayedMsgIds = new Set(); // prevent duplicate rendering
 
         let user_last_known_msg = {};
         let unread_messages = {};
@@ -230,9 +232,10 @@
         function selectUser(id, name) {
             activeUserId = id;
             lastMsgId = 0;
+            displayedMsgIds.clear(); // reset seen messages for new user
             user_last_known_msg[id] = 9999999;
             delete unread_messages[id];
-            stopTitleBlink(); // Stop blinking when user is selected
+            stopTitleBlink();
 
             document.getElementById('active-user-name').querySelector('span').innerText = name;
             document.getElementById('kick-btn-header').style.display = 'block';
@@ -263,39 +266,45 @@
         }
 
         async function pollAdminMessages() {
-            if (!activeUserId) return;
-            const res = await fetch(`/api/admin/poll?user_id=${activeUserId}&after=${lastMsgId}`);
-            const msgs = await res.json();
-            const box = document.getElementById('chat-box');
-            msgs.forEach(m => {
-                lastMsgId = Math.max(lastMsgId, m.id);
-                user_last_known_msg[activeUserId] = lastMsgId;
+            if (!activeUserId || isPollingMsgs) return;
+            isPollingMsgs = true;
+            try {
+                const res = await fetch(`/api/admin/poll?user_id=${activeUserId}&after=${lastMsgId}`);
+                const msgs = await res.json();
+                const box = document.getElementById('chat-box');
+                msgs.forEach(m => {
+                    if (displayedMsgIds.has(m.id)) return; // skip already rendered
+                    displayedMsgIds.add(m.id);
+                    lastMsgId = Math.max(lastMsgId, m.id);
+                    user_last_known_msg[activeUserId] = lastMsgId;
 
-                // Sender 1 is Admin (me), Sender 0 is User (them)
-                let content = m.text;
-                let isText = true;
+                    // Sender 1 is Admin (me), Sender 0 is User (them)
+                    let content = m.text;
+                    let isText = true;
 
-                if (content.startsWith('data:image')) {
-                    content = `<img src="${content}" class="clickable-img" onclick="openImageModal(this.src)" title="انقر للتكبير">`;
-                    isText = false;
-                } else if (content.startsWith('data:application/pdf')) {
-                    content = `<div class="file-download">📄 <b>ملف PDF</b> <a href="${content}" download="file.pdf">تحميل</a></div>`;
-                    isText = false;
-                } else if (content.startsWith('data:')) {
-                    content = `<div class="file-download">📁 <b>ملف مرفق</b> <a href="${content}" download="attachment">تحميل</a></div>`;
-                    isText = false;
-                }
+                    if (content.startsWith('data:image')) {
+                        content = `<img src="${content}" class="clickable-img" onclick="openImageModal(this.src)" title="انقر للتكبير">`;
+                        isText = false;
+                    } else if (content.startsWith('data:application/pdf')) {
+                        content = `<div class="file-download">📄 <b>ملف PDF</b> <a href="${content}" download="file.pdf">تحميل</a></div>`;
+                        isText = false;
+                    } else if (content.startsWith('data:')) {
+                        content = `<div class="file-download">📁 <b>ملف مرفق</b> <a href="${content}" download="attachment">تحميل</a></div>`;
+                        isText = false;
+                    }
 
-                const timeStr = m.timestamp
-                    ? toLatinNums(new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }))
-                    : '';
-                const timeHtml = timeStr ? `<span style="font-size: 10px; opacity: 0.7; margin-right: 10px; float: left;">${timeStr}</span>` : '';
-                const copyAction = isText ? `onclick="copyText(this)" title="انقر لنسخ النص" style="cursor: pointer;"` : '';
-                const msgText = isText ? toLatinNums(content) : content;
+                    const timeStr = m.timestamp
+                        ? toLatinNums(new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }))
+                        : '';
+                    const timeHtml = timeStr ? `<span style="font-size: 10px; opacity: 0.7; margin-right: 10px; float: left;">${timeStr}</span>` : '';
+                    const copyAction = isText ? `onclick="copyText(this)" title="انقر لنسخ النص" style="cursor: pointer;"` : '';
+                    const msgText = isText ? toLatinNums(content) : content;
 
-                box.innerHTML += `<div class="msg ${m.sender === 1 ? 'me' : 'them'}" ${copyAction}>${msgText}${timeHtml}<div style="clear:both;"></div></div>`;
-            });
-            if (msgs.length > 0) box.scrollTop = box.scrollHeight;
+                    box.innerHTML += `<div class="msg ${m.sender === 1 ? 'me' : 'them'}" ${copyAction}>${msgText}${timeHtml}<div style="clear:both;"></div></div>`;
+                });
+                if (msgs.length > 0) box.scrollTop = box.scrollHeight;
+            } catch (e) { console.error('Poll error', e); }
+            finally { isPollingMsgs = false; }
         }
 
         async function sendAdminMessage() {

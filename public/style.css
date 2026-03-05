@@ -38,7 +38,7 @@ body {
     background: var(--white);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    padding: 2.5rem;
+    padding: 2rem 2.2rem 2.2rem;
     border-radius: 24px;
     box-shadow: 0 8px 32px rgba(46, 134, 193, 0.13), 0 0 0 1px rgba(200, 223, 240, 0.6);
     text-align: center;
@@ -101,7 +101,7 @@ input,
 select {
     width: 100%;
     padding: 13px 16px;
-    margin: 6px 0 14px;
+    margin: 4px 0 10px;
     border: 2px solid var(--border);
     border-radius: 14px;
     font-size: 15px;
@@ -124,17 +124,18 @@ button {
     background: linear-gradient(135deg, var(--primary), var(--primary-hover));
     color: var(--white);
     border: none;
-    padding: 13px 22px;
+    padding: 12px 20px;
     border-radius: 14px;
     cursor: pointer;
     width: 100%;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     font-family: 'Cairo', sans-serif;
     transition: all 0.25s ease;
-    box-shadow: 0 6px 20px rgba(0, 119, 182, 0.35);
+    box-shadow: 0 4px 14px rgba(46, 134, 193, 0.3);
     position: relative;
     overflow: hidden;
+    margin-top: 4px;
 }
 
 button::after {
@@ -271,8 +272,12 @@ button:active {
 .msg iframe,
 .msg video {
     max-width: 100%;
+    max-height: 180px;
+    width: auto;
+    object-fit: cover;
     border-radius: 12px;
     margin-top: 5px;
+    display: block;
 }
 
 .clickable-img {

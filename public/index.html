@@ -103,6 +103,8 @@
         let warningTimer;
         let pendingFile = null;
         let audioCtx = null;
+        let isPolling = false;          // prevent concurrent poll calls
+        const displayedMsgIds = new Set(); // prevent duplicate rendering
 
         // Convert Arabic-Indic digits to Western Arabic (English) digits
         function toLatinNums(str) {
@@ -229,7 +231,8 @@
         }
 
         async function pollMessages() {
-            if (!token) return;
+            if (!token || isPolling) return;  // skip if already running
+            isPolling = true;
             try {
                 const res = await fetch(`/api/poll?token=${token}&after=${lastMsgId}`);
                 if (res.status === 401 || res.status === 403) {
@@ -240,6 +243,8 @@
                 const msgs = await res.json();
                 const box = document.getElementById('chat-box');
                 msgs.forEach(m => {
+                    if (displayedMsgIds.has(m.id)) return; // skip already rendered
+                    displayedMsgIds.add(m.id);
                     const isNew = m.id > lastMsgId;
                     lastMsgId = Math.max(lastMsgId, m.id);
                     // Play sound for new messages from doctor (sender=1)
@@ -269,6 +274,7 @@
                 });
                 if (msgs.length > 0) box.scrollTop = box.scrollHeight;
             } catch (e) { console.error("Poll error", e); }
+            finally { isPolling = false; }
         }
 
         // Resume polling when tab becomes visible again (fixes browser throttling)
