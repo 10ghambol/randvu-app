@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Randvu Admin Log</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .user-item.unread {
+            background-color: #fff3f3;
+            border-right: 4px solid var(--danger) !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="confirm-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h2>تأكيد الإرسال</h2>
+            <p id="confirm-filename" style="font-weight: bold; word-break: break-all; margin: 15px 0;"></p>
+            <p>هل تريد إرسال هذا الملف للطبيب والتأكيد؟</p>
+            <button onclick="confirmSendFile()" style="margin-bottom: 10px;">نعم، إرسال</button>
+            <button onclick="cancelSendFile()" style="background:#888;">إلغاء</button>
+        </div>
+    </div>
+
+    <div id="image-modal" class="modal" style="display:none; transition: opacity 0.3s ease;"
+        onclick="closeImageModal()">
+        <span
+            style="position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+        <img class="modal-content" id="full-image"
+            style="width: auto; max-width: 90%; max-height: 90vh; background: transparent; box-shadow: none; padding: 0;">
+    </div>
+
+    <div id="login" class="container">
+        <h2>لوحة الطبيب</h2>
+        <input type="password" id="pass" placeholder="كلمة المرور" onkeypress="if(event.key==='Enter') adminLogin()">
+        <button onclick="adminLogin()">دخول</button>
+    </div>
+
+    <div id="dashboard" style="display:none;">
+        <div class="users-list" id="users-list">
+            <h3>المرضى</h3>
+            <div id="users-container"></div>
+        </div>
+        <div class="chat-container admin-chat">
+            <div class="chat-header" id="active-user-name"
+                style="display: flex; justify-content: space-between; align-items: center;">
+                <span>اختر مريضاً</span>
+                <button id="kick-btn-header" style="display:none; width: auto; font-size: 11px; padding: 4px 8px;"
+                    class="kick-btn" onclick="kickUser()">إغلاق وطرد المريض ✖</button>
+            </div>
+            <div id="chat-box" class="chat-box"></div>
+            <div class="chat-input-area">
+                <input type="text" id="msg" placeholder="اكتب ردك..."
+                    onkeypress="if(event.key==='Enter') sendAdminMessage()">
+                <input type="file" id="file-upload" accept="*/*" style="display: none;" onchange="prepareFile(this)">
+                <button class="icon-btn" onclick="document.getElementById('file-upload').click()"
+                    title="إرفاق ملف">📎</button>
+
+                <input type="file" id="cam-upload" accept="image/*" capture="user" style="display: none;"
+                    onchange="prepareFile(this)">
+                <button class="icon-btn" onclick="document.getElementById('cam-upload').click()"
+                    title="التقاط صورة">📸</button>
+                <button onclick="sendAdminMessage()">إرسال</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pass = '';
+        let activeUserId = 0;
+        let lastMsgId = 0;
+        let msgsInterval;
+        let pendingFile = null;
+
+        let user_last_known_msg = {};
+        let unread_messages = {};
+
+        function playNotificationSound(isReminder = false) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.type = 'sine';
+                if (isReminder) {
+                    osc.frequency.setValueAtTime(440, ctx.currentTime);
+                    osc.frequency.setValueAtTime(554, ctx.currentTime + 0.1);
+                } else {
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+                    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+                }
+
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) { console.error("Audio error", e); }
+        }
+
+        function adminLogin() {
+            pass = document.getElementById('pass').value;
+            if (pass === 'Re.Re1020.') {
+                document.getElementById('login').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'flex';
+                setInterval(pollUsers, 5000);
+                pollUsers();
+            } else {
+                alert("كلمة مرور خاطئة");
+            }
+        }
+
+        async function pollUsers() {
+            const res = await fetch('/api/admin/users');
+            const users = await res.json();
+            const container = document.getElementById('users-container');
+            container.innerHTML = '';
+
+            users.forEach(u => {
+                if (u.last_sender === 0) { // Message from patient
+                    if (activeUserId === u.id) {
+                        user_last_known_msg[u.id] = u.last_msg_id;
+                        delete unread_messages[u.id];
+                    } else if (u.last_msg_id > (user_last_known_msg[u.id] || 0)) {
+                        if (!unread_messages[u.id] || unread_messages[u.id].msgId !== u.last_msg_id) {
+                            unread_messages[u.id] = { msgId: u.last_msg_id, time: Date.now() };
+                            playNotificationSound(false);
+                        } else {
+                            // 1 minute reminder
+                            if (Date.now() - unread_messages[u.id].time > 60000) {
+                                playNotificationSound(true);
+                                unread_messages[u.id].time = Date.now();
+                            }
+                        }
+                    }
+                } else {
+                    user_last_known_msg[u.id] = u.last_msg_id;
+                    delete unread_messages[u.id];
+                }
+
+                const isUnread = !!unread_messages[u.id];
+                const unreadBadge = isUnread ? '<span style="color:red; font-size:12px; font-weight:bold;">(رسالة جديدة)</span>' : '';
+
+                const div = document.createElement('div');
+                div.className = `user-item ${u.id === activeUserId ? 'active' : ''} ${isUnread ? 'unread' : ''}`;
+                div.onclick = () => selectUser(u.id, u.name);
+                div.innerHTML = `<div class="user-info"><strong>${u.name}</strong> ${unreadBadge}<br><small>${u.phone}</small></div>`;
+                container.appendChild(div);
+            });
+        }
+
+        function selectUser(id, name) {
+            activeUserId = id;
+            lastMsgId = 0;
+            user_last_known_msg[id] = 9999999; // temporary block sound until pollAdminMessages completes
+            delete unread_messages[id];
+
+            document.getElementById('active-user-name').querySelector('span').innerText = name;
+            document.getElementById('kick-btn-header').style.display = 'block';
+            document.getElementById('chat-box').innerHTML = '';
+
+            // Update active styling
+            document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            if (msgsInterval) clearInterval(msgsInterval);
+            pollAdminMessages();
+            msgsInterval = setInterval(pollAdminMessages, 2000);
+        }
+
+        async function kickUser() {
+            if (!activeUserId) return;
+            if (!confirm("هل أنت متأكد من طرد هذا المريض وحذف بياناته؟")) return;
+            await fetch('/api/admin/kick', {
+                method: 'POST',
+                body: JSON.stringify({ password: pass, user_id: activeUserId.toString() })
+            });
+            activeUserId = 0;
+            document.getElementById('active-user-name').querySelector('span').innerText = "اختر مريضاً";
+            document.getElementById('kick-btn-header').style.display = 'none';
+            document.getElementById('chat-box').innerHTML = '';
+            if (msgsInterval) clearInterval(msgsInterval);
+            pollUsers();
+        }
+
+        async function pollAdminMessages() {
+            if (!activeUserId) return;
+            const res = await fetch(`/api/admin/poll?user_id=${activeUserId}&after=${lastMsgId}`);
+            const msgs = await res.json();
+            const box = document.getElementById('chat-box');
+            msgs.forEach(m => {
+                lastMsgId = Math.max(lastMsgId, m.id);
+                user_last_known_msg[activeUserId] = lastMsgId;
+
+                // Sender 1 is Admin (me), Sender 0 is User (them)
+                let content = m.text;
+                let isText = true;
+
+                if (content.startsWith('data:image')) {
+                    content = `<img src="${content}" class="clickable-img" onclick="openImageModal(this.src)" title="انقر للتكبير">`;
+                    isText = false;
+                } else if (content.startsWith('data:application/pdf')) {
+                    content = `<div class="file-download">📄 <b>ملف PDF</b> <a href="${content}" download="file.pdf">تحميل</a></div>`;
+                    isText = false;
+                } else if (content.startsWith('data:')) {
+                    content = `<div class="file-download">📁 <b>ملف مرفق</b> <a href="${content}" download="attachment">تحميل</a></div>`;
+                    isText = false;
+                }
+
+                const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '';
+                const timeHtml = timeStr ? `<span style="font-size: 10px; opacity: 0.7; margin-right: 10px; float: left;">${timeStr}</span>` : '';
+                const copyAction = isText ? `onclick="copyText(this)" title="انقر لنسخ النص" style="cursor: pointer;"` : '';
+
+                box.innerHTML += `<div class="msg ${m.sender === 1 ? 'me' : 'them'}" ${copyAction}>${content}${timeHtml}<div style="clear:both;"></div></div>`;
+            });
+            if (msgs.length > 0) box.scrollTop = box.scrollHeight;
+        }
+
+        async function sendAdminMessage() {
+            if (!activeUserId) return;
+            const inp = document.getElementById('msg');
+            const text = inp.value.trim();
+            if (!text) return;
+            inp.value = '';
+
+            await fetch('/api/admin/send', {
+                method: 'POST',
+                body: JSON.stringify({ password: pass, user_id: activeUserId.toString(), msg: text })
+            });
+            pollAdminMessages();
+        }
+
+        function prepareFile(input) {
+            if (!input.files || input.files.length === 0) return;
+            pendingFile = input.files[0];
+            document.getElementById('confirm-filename').innerText = pendingFile.name;
+            document.getElementById('confirm-modal').style.display = 'flex';
+            input.value = ''; // Reset input to allow selecting same file again
+        }
+
+        function cancelSendFile() {
+            pendingFile = null;
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+
+        async function confirmSendFile() {
+            if (!activeUserId || !pendingFile) return;
+            const file = pendingFile;
+            pendingFile = null;
+            document.getElementById('confirm-modal').style.display = 'none';
+
+            const reader = new FileReader();
+            reader.onload = async function () {
+                const b64 = reader.result;
+                const box = document.getElementById('chat-box');
+
+                box.innerHTML += `<div class="msg me" style="opacity:0.6">جاري الإرسال...</div>`;
+                box.scrollTop = box.scrollHeight;
+
+                await fetch('/api/admin/send', {
+                    method: 'POST',
+                    body: JSON.stringify({ password: pass, user_id: activeUserId.toString(), msg: b64 })
+                });
+                pollAdminMessages();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Image formatting and copying features
+        function openImageModal(src) {
+            document.getElementById('full-image').src = src;
+            document.getElementById('image-modal').style.display = 'flex';
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-modal').style.display = 'none';
+        }
+
+        function copyText(element) {
+            // Get only the text, ignore the inner spans like timestamp
+            const textToCopy = Array.from(element.childNodes)
+                .filter(node => node.nodeType === Node.TEXT_NODE)
+                .map(node => node.textContent)
+                .join('').trim();
+
+            if (textToCopy && navigator.clipboard) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const originalBg = element.style.background;
+                    element.style.background = '#2a9d8f'; // Success color
+                    setTimeout(() => { element.style.background = originalBg; }, 300);
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Randvu - منصة الاستشارات الطبية</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="welcome-screen" class="container">
+        <div class="logo-header">
+            <h1 style="margin: 0;">Randvu Medical</h1>
+        </div>
+        <p>مرحباً بك في منصة الاستشارات الطبية الخاصة والآمنة.</p>
+        <button onclick="showModal()">حجز موعد / استشارة</button>
+    </div>
+
+    <div id="fee-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h2>تنبيه هام</h2>
+            <p>رسوم الخدمة والاستشارة هي <span style="color: red; font-weight: bold; font-size: 1.2em;">100 TL</span>.
+            </p>
+            <button onclick="showForm()">موافق</button>
+            <button onclick="hideModal()" style="background:#888;">إلغاء</button>
+        </div>
+    </div>
+
+    <div id="logout-warning-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h2>تنبيه الخمول</h2>
+            <p>ستتم مغادرة الجلسة وحذف مراجعتك بعد 30 ثانية بسبب عدم النشاط. هل أنت متواجد؟</p>
+            <button onclick="stayActive()">نعم، أنا هنا</button>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h2>تأكيد الإرسال</h2>
+            <p id="confirm-filename" style="font-weight: bold; word-break: break-all; margin: 15px 0;"></p>
+            <p>هل تريد إرسال هذا الملف للطبيب والتأكيد؟</p>
+            <button onclick="confirmSendFile()" style="margin-bottom: 10px;">نعم، إرسال</button>
+            <button onclick="cancelSendFile()" style="background:#888;">إلغاء</button>
+        </div>
+    </div>
+
+    <div id="image-modal" class="modal" style="display:none; transition: opacity 0.3s ease;"
+        onclick="closeImageModal()">
+        <span
+            style="position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+        <img class="modal-content" id="full-image"
+            style="width: auto; max-width: 90%; max-height: 90vh; background: transparent; box-shadow: none; padding: 0;">
+    </div>
+
+    <div id="form-screen" class="container" style="display:none;">
+        <h2>بيانات المريض</h2>
+        <select id="req_type"
+            style="width: 100%; padding: 12px; margin: 8px 0 16px; border: 1px solid var(--border); border-radius: 8px;">
+            <option value="حجز موعد مشفى">حجز موعد مشفى</option>
+            <option value="استشارة تحاليل">استشارة تحاليل</option>
+            <option value="طلب اخر">طلب اخر</option>
+        </select>
+        <input type="text" id="fname" placeholder="الاسم الأول">
+        <input type="text" id="sname" placeholder="الكنية">
+        <input type="text" id="phone" placeholder="رقم الهاتف">
+        <button onclick="login()">دخول للدردشة</button>
+    </div>
+
+    <div id="chat-screen" class="chat-container" style="display:none;">
+        <div class="chat-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>محادثة مباشرة مع الطبيب</span>
+            <button onclick="manualLogout()"
+                style="width: auto; padding: 6px 12px; font-size: 12px; background: #e74c3c;">إنهاء الجلسة</button>
+        </div>
+        <div id="chat-box" class="chat-box"></div>
+        <div class="chat-input-area">
+            <input type="text" id="msg" placeholder="اكتب رسالتك هنا..." onkeypress="handleKey(event)"
+                oninput="resetTimer()">
+            <input type="file" id="file-upload" accept="*/*" style="display: none;" onchange="prepareFile(this)">
+            <button class="icon-btn" onclick="document.getElementById('file-upload').click()"
+                title="إرفاق ملف">📎</button>
+
+            <input type="file" id="cam-upload" accept="image/*" capture="environment" style="display: none;"
+                onchange="prepareFile(this)">
+            <button class="icon-btn" onclick="document.getElementById('cam-upload').click()"
+                title="التقاط صورة">📸</button>
+
+            <button onclick="sendMessage()" style="margin-right: 10px;">إرسال</button>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('randvu_token');
+        let lastMsgId = 0;
+        let pollingInterval;
+        let inactivityTimer;
+        let warningTimer;
+        let pendingFile = null;
+
+        if (token) {
+            showChat();
+        }
+
+        function showModal() { document.getElementById('fee-modal').style.display = 'flex'; }
+        function hideModal() { document.getElementById('fee-modal').style.display = 'none'; }
+        function showForm() {
+            hideModal();
+            document.getElementById('welcome-screen').style.display = 'none';
+            document.getElementById('form-screen').style.display = 'block';
+        }
+
+        function resetTimer() {
+            if (!token) return;
+            clearTimeout(inactivityTimer);
+            clearTimeout(warningTimer);
+            document.getElementById('logout-warning-modal').style.display = 'none';
+            // Warning after 2.5 minutes (150000 ms)
+            inactivityTimer = setTimeout(showLogoutWarning, 150000);
+        }
+
+        function showLogoutWarning() {
+            document.getElementById('logout-warning-modal').style.display = 'flex';
+            // Auto logout after another 30 seconds (30000 ms), total 3 mins
+            warningTimer = setTimeout(manualLogout, 30000);
+        }
+
+        function stayActive() {
+            resetTimer();
+        }
+
+        async function manualLogout() {
+            if (token) {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    body: JSON.stringify({ token: token })
+                });
+            }
+            token = null;
+            localStorage.removeItem('randvu_token');
+            clearTimeout(inactivityTimer);
+            clearTimeout(warningTimer);
+            clearInterval(pollingInterval);
+            document.getElementById('chat-screen').style.display = 'none';
+            document.getElementById('logout-warning-modal').style.display = 'none';
+            location.reload();
+        }
+
+        async function login() {
+            const fname = document.getElementById('fname').value;
+            const sname = document.getElementById('sname').value;
+            const phone = document.getElementById('phone').value;
+
+            if (!fname || !sname || !phone) {
+                alert("يرجى تعبئة جميع الحقول");
+                return;
+            }
+
+            const req_type = document.getElementById('req_type').value;
+
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    first_name: fname,
+                    surname: sname,
+                    phone: phone,
+                    req_type: req_type
+                })
+            });
+            const data = await res.json();
+            if (data.token) {
+                token = data.token;
+                localStorage.setItem('randvu_token', token);
+                document.getElementById('form-screen').style.display = 'none';
+                showChat();
+            }
+        }
+
+        function showChat() {
+            document.getElementById('welcome-screen').style.display = 'none';
+            document.getElementById('form-screen').style.display = 'none';
+            document.getElementById('chat-screen').style.display = 'flex';
+            pollingInterval = setInterval(pollMessages, 2000);
+            pollMessages();
+            resetTimer();
+        }
+
+        async function pollMessages() {
+            if (!token) return;
+            try {
+                const res = await fetch(`/api/poll?token=${token}&after=${lastMsgId}`);
+                if (res.status === 401 || res.status === 403) {
+                    alert("تم إنهاء الجلسة من قبل الطبيب.");
+                    await manualLogout();
+                    return;
+                }
+                const msgs = await res.json();
+                const box = document.getElementById('chat-box');
+                msgs.forEach(m => {
+                    lastMsgId = Math.max(lastMsgId, m.id);
+                    let content = m.text;
+                    let isText = true;
+
+                    if (content.startsWith('data:image')) {
+                        content = `<img src="${content}" class="clickable-img" onclick="openImageModal(this.src)" title="انقر للتكبير">`;
+                        isText = false;
+                    } else if (content.startsWith('data:application/pdf')) {
+                        content = `<div class="file-download">📄 <b>ملف PDF</b> <a href="${content}" download="file.pdf">تحميل</a></div>`;
+                        isText = false;
+                    } else if (content.startsWith('data:')) {
+                        content = `<div class="file-download">📁 <b>ملف مرفق</b> <a href="${content}" download="attachment">تحميل</a></div>`;
+                        isText = false;
+                    }
+
+                    const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '';
+                    const timeHtml = timeStr ? `<span style="font-size: 10px; opacity: 0.7; margin-right: 10px; float: left;">${timeStr}</span>` : '';
+                    const copyAction = isText ? `onclick="copyText(this)" title="انقر لنسخ النص" style="cursor: pointer;"` : '';
+
+                    box.innerHTML += `<div class="msg ${m.sender === 0 ? 'me' : 'them'}" ${copyAction}>${content}${timeHtml}<div style="clear:both;"></div></div>`;
+                });
+                if (msgs.length > 0) box.scrollTop = box.scrollHeight;
+            } catch (e) { console.error("Poll error", e); }
+        }
+
+        function handleKey(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        async function sendMessage() {
+            const inp = document.getElementById('msg');
+            const text = inp.value.trim();
+            if (!text) return;
+            inp.value = '';
+
+            try {
+                await fetch('/api/send', {
+                    method: 'POST',
+                    body: JSON.stringify({ token: token, msg: text })
+                });
+            } catch (e) {
+                console.error("Send error", e);
+            }
+            resetTimer();
+            // Trigger poll immediately
+            pollMessages();
+        }
+
+        function prepareFile(input) {
+            if (!input.files || input.files.length === 0) return;
+            pendingFile = input.files[0];
+            document.getElementById('confirm-filename').innerText = pendingFile.name;
+            document.getElementById('confirm-modal').style.display = 'flex';
+            input.value = ''; // Reset input to allow selecting same file again
+        }
+
+        function cancelSendFile() {
+            pendingFile = null;
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+
+        async function confirmSendFile() {
+            if (!pendingFile) return;
+            const file = pendingFile;
+            pendingFile = null;
+            document.getElementById('confirm-modal').style.display = 'none';
+
+            const reader = new FileReader();
+            reader.onload = async function () {
+                const b64 = reader.result;
+
+                // Show a generic sending message immediately so it feels responsive
+                const box = document.getElementById('chat-box');
+                box.innerHTML += `<div class="msg me" style="opacity:0.6">جاري الإرسال...</div>`;
+                box.scrollTop = box.scrollHeight;
+
+                await fetch('/api/send', {
+                    method: 'POST',
+                    body: JSON.stringify({ token: token, msg: b64 })
+                });
+                resetTimer();
+                pollMessages();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Image formatting and copying features
+        function openImageModal(src) {
+            document.getElementById('full-image').src = src;
+            document.getElementById('image-modal').style.display = 'flex';
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-modal').style.display = 'none';
+        }
+
+        function copyText(element) {
+            // Get only the text, ignore the inner spans like timestamp
+            const textToCopy = Array.from(element.childNodes)
+                .filter(node => node.nodeType === Node.TEXT_NODE)
+                .map(node => node.textContent)
+                .join('').trim();
+
+            if (textToCopy && navigator.clipboard) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const originalBg = element.style.background;
+                    element.style.background = '#2a9d8f'; // Success color
+                    setTimeout(() => { element.style.background = originalBg; }, 300);
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>

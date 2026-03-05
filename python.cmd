@@ -1,0 +1,1 @@
+python setup_git_auto.py

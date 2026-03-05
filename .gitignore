@@ -1,0 +1,21 @@
+# C build artifacts
+*.o
+*.exe
+server
+
+# Tools and specific local executables
+cloudflared.exe
+cloudflared.log
+cloudflared_output.txt
+ngrok/
+ngrok.zip
+
+# Databases (It's best practice not to push large databases or user data to Git)
+*.db
+*.sqlite
+*.sqlite3
+randvu.db
+
+# OS generated files
+.DS_Store
+Thumbs.db
