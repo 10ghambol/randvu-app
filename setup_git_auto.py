@@ -24,12 +24,20 @@ def init_git_repo():
     # 4. Set branch to main
     subprocess.run(["git", "branch", "-M", "main"], check=False)
     
-    # 5. Add remote (The user explicitly said to use issatsr1)
-    # We will try to add it, if it exists, we will set URL instead
-    result = subprocess.run(["git", "remote", "add", "origin", "https://github.com/issatsr1/randvu-app.git"], 
-                            capture_output=True, text=True)
+    # 5. Ask user for their Repository URL dynamically
+    print("\n[?] We need your GitHub Repository URL to connect it to your account.")
+    print("    1. Go to your GitHub project in your browser.")
+    print("    2. Click the green 'Code' button and copy the HTTPS URL.")
+    print("       (It looks like: https://github.com/Username/randvu-app.git)")
+    repo_url = input("\n[>] Please Paste your GitHub Repo URL here and press Enter: ").strip()
+    
+    if not repo_url:
+        print("[!] No URL provided. Setup cancelled.")
+        return
+        
+    result = subprocess.run(["git", "remote", "add", "origin", repo_url], capture_output=True, text=True)
     if "already exists" in result.stderr:
-        subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/issatsr1/randvu-app.git"], check=False)
+        subprocess.run(["git", "remote", "set-url", "origin", repo_url], check=False)
     
     # 6. Push to github
     print("\n[.] Pushing code to GitHub (A browser window might open asking you to Sign In)...")
