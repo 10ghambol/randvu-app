@@ -142,6 +142,12 @@
             showChat();
         }
 
+        function showBrowserNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, { body: body, icon: '/favicon.ico', silent: true });
+            }
+        }
+
         function showModal() { document.getElementById('fee-modal').style.display = 'flex'; }
         function hideModal() { document.getElementById('fee-modal').style.display = 'none'; }
         function showForm() {
@@ -225,6 +231,10 @@
             document.getElementById('welcome-screen').style.display = 'none';
             document.getElementById('form-screen').style.display = 'none';
             document.getElementById('chat-screen').style.display = 'flex';
+            // Request browser notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
             pollingInterval = setInterval(pollMessages, 2000);
             pollMessages();
             resetTimer();
@@ -247,8 +257,11 @@
                     displayedMsgIds.add(m.id);
                     const isNew = m.id > lastMsgId;
                     lastMsgId = Math.max(lastMsgId, m.id);
-                    // Play sound for new messages from doctor (sender=1)
-                    if (isNew && m.sender === 1) playNotificationSound();
+                    // Play sound + browser notification for new messages from doctor (sender=1)
+                    if (isNew && m.sender === 1) {
+                        playNotificationSound();
+                        showBrowserNotification('💬 رسالة جديدة من الطبيب', m.text && !m.text.startsWith('data:') ? m.text.substring(0, 60) : 'صورة أو ملف');
+                    }
                     let content = m.text;
                     let isText = true;
 

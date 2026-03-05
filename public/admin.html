@@ -159,6 +159,10 @@
         function showDashboard() {
             document.getElementById('login').style.display = 'none';
             document.getElementById('dashboard').style.display = 'flex';
+            // Request notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
             setInterval(pollUsers, 5000);
             pollUsers();
         }
@@ -178,6 +182,12 @@
         // Auto-login on page load/refresh if session exists
         if (pass === 'Re.Re1020.') showDashboard();
 
+        function showBrowserNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, { body: body, icon: '/favicon.ico', silent: true });
+            }
+        }
+
         async function pollUsers() {
             const res = await fetch('/api/admin/users');
             const users = await res.json();
@@ -195,20 +205,25 @@
                 }
 
                 if (u.last_sender === 0) { // Message from patient
-                    if (activeUserId === u.id) {
-                        user_last_known_msg[u.id] = u.last_msg_id;
-                        delete unread_messages[u.id];
-                    } else if (u.last_msg_id > (user_last_known_msg[u.id] || 0)) {
+                    if (u.last_msg_id > (user_last_known_msg[u.id] || 0)) {
                         if (!unread_messages[u.id] || unread_messages[u.id].msgId !== u.last_msg_id) {
                             unread_messages[u.id] = { msgId: u.last_msg_id, time: Date.now() };
-                            playNotificationSound(false);
-                        } else {
-                            // 1 minute reminder
+                            // Notify always — even if conversation is open
+                            if (activeUserId !== u.id) {
+                                playNotificationSound(false);
+                                showBrowserNotification('💬 رسالة جديدة', u.name + ' أرسل رسالة');
+                            }
+                            // If open conversation — sound is handled in pollAdminMessages
+                        } else if (activeUserId !== u.id) {
+                            // 1 minute reminder for background conversations
                             if (Date.now() - unread_messages[u.id].time > 60000) {
                                 playNotificationSound(true);
                                 unread_messages[u.id].time = Date.now();
                             }
                         }
+                    } else if (activeUserId === u.id) {
+                        user_last_known_msg[u.id] = u.last_msg_id;
+                        delete unread_messages[u.id];
                     }
                 } else {
                     user_last_known_msg[u.id] = u.last_msg_id;
@@ -273,12 +288,16 @@
                 const msgs = await res.json();
                 const box = document.getElementById('chat-box');
                 msgs.forEach(m => {
-                    if (displayedMsgIds.has(m.id)) return; // skip already rendered
+                    if (displayedMsgIds.has(m.id)) return;
                     displayedMsgIds.add(m.id);
                     lastMsgId = Math.max(lastMsgId, m.id);
                     user_last_known_msg[activeUserId] = lastMsgId;
 
-                    // Sender 1 is Admin (me), Sender 0 is User (them)
+                    // Play sound + browser notification for new patient messages even when conv is open
+                    if (m.sender === 0) {
+                        playNotificationSound(false);
+                        showBrowserNotification('💬 رسالة جديدة', 'المريض أرسل رسالة');
+                    }
                     let content = m.text;
                     let isText = true;
 
