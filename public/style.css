@@ -1,18 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
 
 :root {
-    --primary: #0077b6;
-    --primary-hover: #023e8a;
-    --primary-light: #90e0ef;
-    --bg-color: #f0f4f8;
-    --text: #1a1c2e;
+    --primary: #2e86c1;
+    --primary-hover: #1a5276;
+    --primary-light: #aed6f1;
+    --bg-color: #eaf4fb;
+    --text: #1c2b36;
     --white: #ffffff;
-    --gray: #eef2f5;
-    --border: #dde3ea;
-    --danger: #ef233c;
-    --success: #2a9d8f;
-    --shadow: rgba(0, 119, 182, 0.12);
-    --glass: rgba(255, 255, 255, 0.7);
+    --gray: #f0f6fb;
+    --border: #c8dff0;
+    --danger: #e74c3c;
+    --success: #1abc9c;
+    --shadow: rgba(46, 134, 193, 0.1);
+    --glass: rgba(255, 255, 255, 0.82);
 }
 
 * {
@@ -23,7 +23,7 @@
 
 body {
     font-family: 'Cairo', sans-serif;
-    background: linear-gradient(135deg, #0077b6 0%, #023e8a 50%, #1a1c2e 100%);
+    background: linear-gradient(150deg, #dbeef9 0%, #eaf4fb 50%, #f5f9fd 100%);
     color: var(--text);
     display: flex;
     justify-content: center;
@@ -35,12 +35,12 @@ body {
 
 /* ===== WELCOME / FORM CONTAINERS ===== */
 .container {
-    background: var(--glass);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: var(--white);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 2.5rem;
     border-radius: 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px rgba(46, 134, 193, 0.13), 0 0 0 1px rgba(200, 223, 240, 0.6);
     text-align: center;
     width: 90%;
     max-width: 440px;
@@ -177,7 +177,7 @@ button:active {
     text-align: center;
     width: 90%;
     max-width: 400px;
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 8px 32px rgba(46, 134, 193, 0.15);
     animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     direction: rtl;
 }
@@ -204,9 +204,9 @@ button:active {
     border-radius: 24px;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px rgba(46, 134, 193, 0.14);
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--border);
 }
 
 .chat-header {
@@ -249,8 +249,8 @@ button:active {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    background: #f0f4f8;
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230077b6' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background: #f4f9fd;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232e86c1' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
     scroll-behavior: smooth;
     gap: 10px;
 }
@@ -287,7 +287,7 @@ button:active {
 
 /* Patient = RTL right side (me), Doctor = left side (them) in RTL */
 .msg.me {
-    background: linear-gradient(135deg, var(--primary), #0096d6);
+    background: linear-gradient(135deg, var(--primary), #3ea8e0);
     color: var(--white);
     align-self: flex-start;
     border-top-right-radius: 4px;
@@ -384,7 +384,7 @@ button:active {
     height: 92dvh;
     background: var(--white);
     border-radius: 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px rgba(46, 134, 193, 0.15);
     overflow: hidden;
     display: flex;
 }
