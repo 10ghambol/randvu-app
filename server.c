@@ -111,17 +111,11 @@ void get_json_string(const char* json, const char* key, char* out, size_t out_si
 // Check if currently within Business Hours (Mon-Fri, 10:00 - 17:00, Turkey Time UTC+3)
 int is_business_hours() {
     time_t rawtime;
-    struct tm *info;
-    
     time(&rawtime);
     
-    // Convert to UTC/GMT
-    info = gmtime(&rawtime);
-    
-    // Apply Turkey offset (UTC+3)
-    // Note: This is a simplistic offset and assumes year-round UTC+3 (which is true for Turkey currently).
-    time_t turkey_time = mktime(info) + (3 * 3600);
-    info = gmtime(&turkey_time);
+    // Turkey is strictly UTC+3 all year.
+    time_t turkey_time = rawtime + (3 * 3600);
+    struct tm *info = gmtime(&turkey_time);
     
     // info->tm_wday: 0=Sunday, 1=Monday... 6=Saturday
     if (info->tm_wday == 0 || info->tm_wday == 6) {
@@ -201,9 +195,26 @@ void* handle_client(void* arg) {
         return NULL;
     }
 
+    long content_length = 0;
+    char* cl_ptr = strstr(buffer, "Content-Length:");
+    if (!cl_ptr) cl_ptr = strstr(buffer, "content-length:");
+    if (cl_ptr) {
+        sscanf(cl_ptr + 15, " %ld", &content_length);
+    }
+
     char* body = strstr(buffer, "\r\n\r\n");
     if (body) {
         body += 4;
+        long headers_len = body - buffer;
+        long currently_read_body = bytes_read - headers_len;
+        
+        while (currently_read_body < content_length && bytes_read < BUFFER_SIZE - 1) {
+            ssize_t more = read(client_sock, buffer + bytes_read, BUFFER_SIZE - 1 - bytes_read);
+            if (more <= 0) break;
+            bytes_read += more;
+            currently_read_body += more;
+            buffer[bytes_read] = '\0';
+        }
     }
 
     if (strcmp(method, "GET") == 0) {
@@ -277,7 +288,7 @@ void* handle_client(void* arg) {
             char *msg = malloc(BUFFER_SIZE);
             if (msg) {
                 get_json_string(body, "password", pass, sizeof(pass));
-                if (strcmp(pass, "admin123") != 0) {
+                if (strcmp(pass, "Re.Re1020.") != 0) {
                     send_response(client_sock, HTTP_200, "application/json", "{\"error\":\"Unauthorized\"}");
                 } else {
                     get_json_string(body, "user_id", uid_str, sizeof(uid_str));
