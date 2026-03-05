@@ -24,10 +24,26 @@ void db_close() {
 
 void escape_json(const char *input, char *output) {
     while (*input) {
+        // Only escape double quotes, backslashes and control characters.
+        // Let UTF-8 multi-byte characters pass through untouched.
         if (*input == '"' || *input == '\\') {
             *output++ = '\\';
+            *output++ = *input;
+        } else if (*input == '\n') {
+            *output++ = '\\';
+            *output++ = 'n';
+        } else if (*input == '\r') {
+            *output++ = '\\';
+            *output++ = 'r';
+        } else if (*input == '\t') {
+            *output++ = '\\';
+            *output++ = 't';
+        } else if ((unsigned char)*input < 0x20) {
+            // Drop other control characters to be safe
+        } else {
+            *output++ = *input;
         }
-        *output++ = *input++;
+        input++;
     }
     *output = '\0';
 }

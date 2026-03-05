@@ -24,7 +24,8 @@ git commit -m "Auto-backup on %date% %time%"
 
 echo.
 echo [3/3] Pushing to GitHub...
-git push -u origin main
+:: Force push to the new 10ghambol account directly to avoid upstream issues
+git push -u https://github.com/10ghambol/randvu-app.git main
 if %errorlevel% neq 0 (
     echo [ERROR] Git push failed! Please check your internet connection or GitHub credentials.
     pause
