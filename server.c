@@ -65,20 +65,40 @@ void get_json_string(const char* json, const char* key, char* out, size_t out_si
     char search_key[256];
     snprintf(search_key, sizeof(search_key), "\"%s\":\"", key);
     const char* start = strstr(json, search_key);
+    
     if (start) {
         start += strlen(search_key);
         char* out_ptr = out;
         const char* in_ptr = start;
         size_t written = 0;
         
-        while (*in_ptr && *in_ptr != '"' && written < out_size - 4) {
-            if (*in_ptr == '\\' && *(in_ptr + 1) == 'u') {
-                in_ptr += 2; // Skip \u
-                if (!decode_unicode_escape(&in_ptr, &out_ptr)) break;
-            } else if (*in_ptr == '\\' && *(in_ptr + 1) != '\0') {
-               // Handle basic escapes like \n, \", \\ 
-               in_ptr++; // Skip slash
-               *out_ptr++ = *in_ptr++;
+        while (*in_ptr && written < out_size - 1) {
+            // Stop at unescaped quote
+            if (*in_ptr == '"') {
+                break;
+            }
+            
+            if (*in_ptr == '\\') {
+                in_ptr++; // skip backslash
+                if (*in_ptr == '\0') break; // malformed
+                
+                if (*in_ptr == 'u') {
+                    in_ptr++; // skip 'u'
+                    if (!decode_unicode_escape(&in_ptr, &out_ptr)) {
+                        break; // malformed unicode
+                    }
+                    written = out_ptr - out;
+                    continue; // decode_unicode_escape already advances in_ptr
+                } else if (*in_ptr == 'n') { *out_ptr++ = '\n'; }
+                else if (*in_ptr == 'r') { *out_ptr++ = '\r'; }
+                else if (*in_ptr == 't') { *out_ptr++ = '\t'; }
+                else if (*in_ptr == '"') { *out_ptr++ = '"'; }
+                else if (*in_ptr == '\\') { *out_ptr++ = '\\'; }
+                else if (*in_ptr == '/') { *out_ptr++ = '/'; } // CRITICAL for Base64 (data:image\/jpeg...)
+                else { 
+                    *out_ptr++ = *in_ptr; // just copy unknown escapes
+                }
+                in_ptr++;
             } else {
                 *out_ptr++ = *in_ptr++;
             }
