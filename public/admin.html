@@ -90,9 +90,27 @@
             return String(str).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
         }
 
+        // Shared AudioContext — initialized on first user interaction
+        let sharedAudioCtx = null;
+        function getAdminAudioCtx() {
+            if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+                sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return sharedAudioCtx;
+        }
+        // Unlock audio on first user gesture
+        function unlockAdminAudio() {
+            const ctx = getAdminAudioCtx();
+            if (ctx.state === 'suspended') ctx.resume();
+            document.removeEventListener('click', unlockAdminAudio);
+            document.removeEventListener('touchstart', unlockAdminAudio);
+        }
+        document.addEventListener('click', unlockAdminAudio);
+        document.addEventListener('touchstart', unlockAdminAudio);
+
         function playNotificationSound(isReminder = false) {
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const ctx = getAdminAudioCtx();
                 if (ctx.state === 'suspended') ctx.resume();
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
