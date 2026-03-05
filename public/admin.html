@@ -78,6 +78,9 @@
 
         let user_last_known_msg = {};
         let unread_messages = {};
+        let knownUserIds = new Set(); // to detect brand-new conversations
+        let titleBlinkInterval = null;
+        const originalTitle = 'Randvu Admin Log';
 
         function playNotificationSound(isReminder = false) {
             try {
@@ -106,6 +109,45 @@
             } catch (e) { console.error("Audio error", e); }
         }
 
+        // New patient sound (ascending 3-tone)
+        function playNewUserSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+                [523.25, 659.25, 783.99].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    const t = ctx.currentTime + i * 0.15;
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(0.4, t + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                    osc.start(t);
+                    osc.stop(t + 0.3);
+                });
+            } catch (e) { console.error('Audio error', e); }
+        }
+
+        function startTitleBlink(msg) {
+            if (titleBlinkInterval) return; // already blinking
+            let toggle = false;
+            titleBlinkInterval = setInterval(() => {
+                document.title = toggle ? originalTitle : msg;
+                toggle = !toggle;
+            }, 1000);
+        }
+
+        function stopTitleBlink() {
+            if (titleBlinkInterval) {
+                clearInterval(titleBlinkInterval);
+                titleBlinkInterval = null;
+                document.title = originalTitle;
+            }
+        }
+
         function adminLogin() {
             pass = document.getElementById('pass').value;
             if (pass === 'Re.Re1020.') {
@@ -125,6 +167,15 @@
             container.innerHTML = '';
 
             users.forEach(u => {
+                // Detect brand-new conversations
+                if (!knownUserIds.has(u.id)) {
+                    if (knownUserIds.size > 0) { // don't alert on initial load
+                        playNewUserSound();
+                        startTitleBlink('🔔 مريض جديد!');
+                    }
+                    knownUserIds.add(u.id);
+                }
+
                 if (u.last_sender === 0) { // Message from patient
                     if (activeUserId === u.id) {
                         user_last_known_msg[u.id] = u.last_msg_id;
@@ -149,6 +200,9 @@
                 const isUnread = !!unread_messages[u.id];
                 const unreadBadge = isUnread ? '<span style="color:red; font-size:12px; font-weight:bold;">(رسالة جديدة)</span>' : '';
 
+                // Blink title if there are any unread messages (patient side)
+                if (isUnread) startTitleBlink('💬 رسالة جديدة!');
+
                 const div = document.createElement('div');
                 div.className = `user-item ${u.id === activeUserId ? 'active' : ''} ${isUnread ? 'unread' : ''}`;
                 div.onclick = () => selectUser(u.id, u.name);
@@ -160,8 +214,9 @@
         function selectUser(id, name) {
             activeUserId = id;
             lastMsgId = 0;
-            user_last_known_msg[id] = 9999999; // temporary block sound until pollAdminMessages completes
+            user_last_known_msg[id] = 9999999;
             delete unread_messages[id];
+            stopTitleBlink(); // Stop blinking when user is selected
 
             document.getElementById('active-user-name').querySelector('span').innerText = name;
             document.getElementById('kick-btn-header').style.display = 'block';
@@ -308,11 +363,19 @@
             if (textToCopy && navigator.clipboard) {
                 navigator.clipboard.writeText(textToCopy).then(() => {
                     const originalBg = element.style.background;
-                    element.style.background = '#2a9d8f'; // Success color
+                    element.style.background = '#2a9d8f';
                     setTimeout(() => { element.style.background = originalBg; }, 300);
                 });
             }
         }
+
+        // Keep polling alive when tab regains focus (prevents browser throttling)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                pollUsers();
+                if (activeUserId) pollAdminMessages();
+            }
+        });
     </script>
 </body>
 

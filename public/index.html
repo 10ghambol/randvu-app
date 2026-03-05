@@ -102,6 +102,33 @@
         let inactivityTimer;
         let warningTimer;
         let pendingFile = null;
+        let audioCtx = null;
+
+        function getAudioCtx() {
+            if (!audioCtx || audioCtx.state === 'closed') {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioCtx;
+        }
+
+        function playNotificationSound() {
+            try {
+                const ctx = getAudioCtx();
+                if (ctx.state === 'suspended') ctx.resume();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+                osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) { console.error('Audio error', e); }
+        }
 
         if (token) {
             showChat();
@@ -207,7 +234,10 @@
                 const msgs = await res.json();
                 const box = document.getElementById('chat-box');
                 msgs.forEach(m => {
+                    const isNew = m.id > lastMsgId;
                     lastMsgId = Math.max(lastMsgId, m.id);
+                    // Play sound for new messages from doctor (sender=1)
+                    if (isNew && m.sender === 1) playNotificationSound();
                     let content = m.text;
                     let isText = true;
 
@@ -231,6 +261,13 @@
                 if (msgs.length > 0) box.scrollTop = box.scrollHeight;
             } catch (e) { console.error("Poll error", e); }
         }
+
+        // Resume polling when tab becomes visible again (fixes browser throttling)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && token) {
+                pollMessages();
+            }
+        });
 
         function handleKey(e) {
             if (e.key === 'Enter') sendMessage();

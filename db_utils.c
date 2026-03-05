@@ -181,13 +181,22 @@ char* db_get_users() {
     char *res = malloc(cap);
     strcpy(res, "[");
     size_t len = 1;
-    if (sqlite3_prepare_v2(db, "SELECT id, first_name, surname, phone FROM users", -1, &stmt, NULL) == SQLITE_OK) {
+    if (sqlite3_prepare_v2(db,
+        "SELECT u.id, u.first_name, u.surname, u.phone, "
+        "COALESCE(m.id, 0) as last_msg_id, COALESCE(m.sender_type, -1) as last_sender "
+        "FROM users u "
+        "LEFT JOIN messages m ON m.id = ("
+        "  SELECT id FROM messages WHERE user_id = u.id ORDER BY id DESC LIMIT 1"
+        ") ORDER BY last_msg_id DESC",
+        -1, &stmt, NULL) == SQLITE_OK) {
         int first = 1;
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             int id = sqlite3_column_int(stmt, 0);
             const unsigned char* fn = sqlite3_column_text(stmt, 1);
             const unsigned char* sn = sqlite3_column_text(stmt, 2);
             const unsigned char* ph = sqlite3_column_text(stmt, 3);
+            int last_msg_id = sqlite3_column_int(stmt, 4);
+            int last_sender  = sqlite3_column_int(stmt, 5);
             
             char e_fn[256]={0}, e_sn[256]={0}, e_ph[256]={0};
             if(fn) escape_json((const char*)fn, e_fn);
@@ -195,7 +204,8 @@ char* db_get_users() {
             if(ph) escape_json((const char*)ph, e_ph);
             
             char buf[1024];
-            snprintf(buf, sizeof(buf), "{\"id\":%d,\"name\":\"%s %s\",\"phone\":\"%s\"}", id, e_fn, e_sn, e_ph);
+            snprintf(buf, sizeof(buf), "{\"id\":%d,\"name\":\"%s %s\",\"phone\":\"%s\",\"last_msg_id\":%d,\"last_sender\":%d}",
+                     id, e_fn, e_sn, e_ph, last_msg_id, last_sender);
             
             size_t buf_len = strlen(buf);
             if (len + buf_len + 2 > cap) {
