@@ -78,9 +78,15 @@
 
         let user_last_known_msg = {};
         let unread_messages = {};
-        let knownUserIds = new Set(); // to detect brand-new conversations
+        let knownUserIds = new Set();
         let titleBlinkInterval = null;
         const originalTitle = 'Randvu Admin Log';
+
+        // Convert Arabic-Indic digits to Western Arabic (English) digits
+        function toLatinNums(str) {
+            if (!str) return str;
+            return String(str).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+        }
 
         function playNotificationSound(isReminder = false) {
             try {
@@ -270,11 +276,14 @@
                     isText = false;
                 }
 
-                const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '';
+                const timeStr = m.timestamp
+                    ? toLatinNums(new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }))
+                    : '';
                 const timeHtml = timeStr ? `<span style="font-size: 10px; opacity: 0.7; margin-right: 10px; float: left;">${timeStr}</span>` : '';
                 const copyAction = isText ? `onclick="copyText(this)" title="انقر لنسخ النص" style="cursor: pointer;"` : '';
+                const msgText = isText ? toLatinNums(content) : content;
 
-                box.innerHTML += `<div class="msg ${m.sender === 1 ? 'me' : 'them'}" ${copyAction}>${content}${timeHtml}<div style="clear:both;"></div></div>`;
+                box.innerHTML += `<div class="msg ${m.sender === 1 ? 'me' : 'them'}" ${copyAction}>${msgText}${timeHtml}<div style="clear:both;"></div></div>`;
             });
             if (msgs.length > 0) box.scrollTop = box.scrollHeight;
         }
