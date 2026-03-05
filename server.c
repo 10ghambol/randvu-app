@@ -11,7 +11,7 @@
 #include "db_utils.h"
 
 #define DEFAULT_PORT 8080
-#define BUFFER_SIZE 8192
+#define BUFFER_SIZE (1024 * 1024 * 5) // 5MB buffer for large Base64 images
 #define MAX_PATH 1024
 
 const char *HTTP_200 = "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: close\r\n\r\n";
@@ -159,17 +159,24 @@ void* handle_client(void* arg) {
     int client_sock = *(int*)arg;
     free(arg);
 
-    char buffer[BUFFER_SIZE];
-    ssize_t bytes_read = read(client_sock, buffer, sizeof(buffer) - 1);
+    char *buffer = malloc(BUFFER_SIZE);
+    if (!buffer) {
+        close(client_sock);
+        return NULL;
+    }
+    
+    ssize_t bytes_read = read(client_sock, buffer, BUFFER_SIZE - 1);
     if (bytes_read <= 0) {
+        free(buffer);
         close(client_sock);
         return NULL;
     }
     buffer[bytes_read] = '\0';
-
+    
     char method[16], path[MAX_PATH];
     if (sscanf(buffer, "%15s %1023s", method, path) != 2) {
         write(client_sock, HTTP_400, strlen(HTTP_400));
+        free(buffer);
         close(client_sock);
         return NULL;
     }
@@ -225,34 +232,42 @@ void* handle_client(void* arg) {
                 write(client_sock, HTTP_500, strlen(HTTP_500));
             }
         } else if (strcmp(path, "/api/send") == 0) {
-            char token[128]="", msg[2048]="";
-            get_json_string(body, "token", token, sizeof(token));
-            get_json_string(body, "msg", msg, sizeof(msg));
-            
-            if (strlen(msg) > 0) {
-                if (is_business_hours()) {
-                    db_save_message(token, 0, msg);
-                    send_response(client_sock, HTTP_200, "application/json", "{\"status\":\"ok\"}");
+            char token[128]="";
+            char *msg = malloc(BUFFER_SIZE);
+            if (msg) {
+                get_json_string(body, "token", token, sizeof(token));
+                get_json_string(body, "msg", msg, BUFFER_SIZE);
+                
+                if (strlen(msg) > 0) {
+                    if (is_business_hours()) {
+                        db_save_message(token, 0, msg);
+                        send_response(client_sock, HTTP_200, "application/json", "{\"status\":\"ok\"}");
+                    } else {
+                        // Send an error message back to the client if outside business hours
+                        send_response(client_sock, HTTP_200, "application/json", 
+                            "{\"error\":\"عذراً، العيادة مغلقة حالياً. أوقات الدوام من الإثنين للجمعة (10 صباحاً - 5 مساءً).\"}");
+                    }
                 } else {
-                    // Send an error message back to the client if outside business hours
-                    send_response(client_sock, HTTP_200, "application/json", 
-                        "{\"error\":\"عذراً، العيادة مغلقة حالياً. أوقات الدوام من الإثنين للجمعة (10 صباحاً - 5 مساءً).\"}");
+                    send_response(client_sock, HTTP_200, "application/json", "{\"error\":\"Empty message\"}");
                 }
-            } else {
-                send_response(client_sock, HTTP_200, "application/json", "{\"error\":\"Empty message\"}");
+                free(msg);
             }
         } else if (strcmp(path, "/api/admin/send") == 0) {
-            char uid_str[32]="", msg[2048]="", pass[128]="";
-            get_json_string(body, "password", pass, sizeof(pass));
-            if (strcmp(pass, "admin123") != 0) {
-                send_response(client_sock, HTTP_200, "application/json", "{\"error\":\"Unauthorized\"}");
-            } else {
-                get_json_string(body, "user_id", uid_str, sizeof(uid_str));
-                get_json_string(body, "msg", msg, sizeof(msg));
-                if (strlen(msg) > 0) {
-                    db_save_message_admin(atoi(uid_str), msg);
+            char uid_str[32]="", pass[128]="";
+            char *msg = malloc(BUFFER_SIZE);
+            if (msg) {
+                get_json_string(body, "password", pass, sizeof(pass));
+                if (strcmp(pass, "admin123") != 0) {
+                    send_response(client_sock, HTTP_200, "application/json", "{\"error\":\"Unauthorized\"}");
+                } else {
+                    get_json_string(body, "user_id", uid_str, sizeof(uid_str));
+                    get_json_string(body, "msg", msg, BUFFER_SIZE);
+                    if (strlen(msg) > 0) {
+                        db_save_message_admin(atoi(uid_str), msg);
+                    }
+                    send_response(client_sock, HTTP_200, "application/json", "{\"status\":\"ok\"}");
                 }
-                send_response(client_sock, HTTP_200, "application/json", "{\"status\":\"ok\"}");
+                free(msg);
             }
         } else {
             write(client_sock, HTTP_404, strlen(HTTP_404));
@@ -261,6 +276,7 @@ void* handle_client(void* arg) {
         write(client_sock, HTTP_400, strlen(HTTP_400));
     }
 
+    free(buffer);
     close(client_sock);
     return NULL;
 }
