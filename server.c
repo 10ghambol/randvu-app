@@ -210,9 +210,15 @@ void* handle_client(void* arg) {
             const char* a_start = strstr(path, "after=");
             if(a_start) sscanf(a_start, "after=%d", &after_id);
             
-            char* j_res = db_get_messages(token, after_id);
-            send_response(client_sock, HTTP_200, "application/json", j_res);
-            free(j_res);
+            // Return 401 if token is invalid (patient was kicked)
+            if (get_user_id_by_token(token) == -1) {
+                const char* r401 = "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"error\":\"kicked\"}";
+                write(client_sock, r401, strlen(r401));
+            } else {
+                char* j_res = db_get_messages(token, after_id);
+                send_response(client_sock, HTTP_200, "application/json", j_res);
+                free(j_res);
+            }
         } else if (strncmp(path, "/api/admin/users", 16) == 0) {
              char* j_res = db_get_users();
              send_response(client_sock, HTTP_200, "application/json", j_res);
@@ -283,6 +289,21 @@ void* handle_client(void* arg) {
                     send_response(client_sock, HTTP_200, "application/json", "{\"status\":\"ok\"}");
                 }
                 free(msg);
+            }
+        } else if (strcmp(path, "/api/logout") == 0) {
+            char token[128]="";
+            get_json_string(body, "token", token, sizeof(token));
+            db_delete_user_by_token(token);
+            send_response(client_sock, HTTP_200, "application/json", "{\"status\":\"ok\"}");
+        } else if (strcmp(path, "/api/admin/kick") == 0) {
+            char uid_str[32]="", pass[128]="";
+            get_json_string(body, "password", pass, sizeof(pass));
+            if (strcmp(pass, "Re.Re1020.") != 0) {
+                send_response(client_sock, HTTP_200, "application/json", "{\"error\":\"Unauthorized\"}");
+            } else {
+                get_json_string(body, "user_id", uid_str, sizeof(uid_str));
+                db_delete_user(atoi(uid_str));
+                send_response(client_sock, HTTP_200, "application/json", "{\"status\":\"ok\"}");
             }
         } else {
             write(client_sock, HTTP_404, strlen(HTTP_404));

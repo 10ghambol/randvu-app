@@ -11,5 +11,7 @@ char* db_get_messages(const char* session_token, int after_msg_id);
 char* db_get_users();
 char* db_get_messages_admin(int user_id, int after_msg_id);
 int db_save_message_admin(int user_id, const char* content);
+int db_delete_user(int user_id);
+int db_delete_user_by_token(const char* token);
 
 #endif

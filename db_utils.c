@@ -104,6 +104,30 @@ int db_save_message_admin(int user_id, const char* content) {
     return db_save_message_internal(user_id, 1, content);
 }
 
+int db_delete_user(int user_id) {
+    sqlite3_stmt *stmt;
+    // Delete messages first
+    if (sqlite3_prepare_v2(db, "DELETE FROM messages WHERE user_id = ?", -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    // Delete user
+    if (sqlite3_prepare_v2(db, "DELETE FROM users WHERE id = ?", -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, user_id);
+        int rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        return rc == SQLITE_DONE;
+    }
+    return 0;
+}
+
+int db_delete_user_by_token(const char* token) {
+    int uid = get_user_id_by_token(token);
+    if (uid == -1) return 0;
+    return db_delete_user(uid);
+}
+
 char* build_json_messages(sqlite3_stmt *stmt) {
     size_t cap = 8192;
     char *res = malloc(cap);
