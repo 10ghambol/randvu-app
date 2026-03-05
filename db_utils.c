@@ -105,22 +105,40 @@ int db_save_message_admin(int user_id, const char* content) {
 }
 
 char* build_json_messages(sqlite3_stmt *stmt) {
-    char *res = malloc(8192);
+    size_t cap = 8192;
+    char *res = malloc(cap);
     strcpy(res, "[");
+    size_t len = 1;
     int first = 1;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
-        if (!first) strcat(res, ",");
-        first = 0;
         int id = sqlite3_column_int(stmt, 0);
         int sender = sqlite3_column_int(stmt, 1);
         const unsigned char* content = sqlite3_column_text(stmt, 2);
         
-        char escaped[1024] = {0};
+        size_t content_len = content ? strlen((const char*)content) : 0;
+        size_t escaped_len = content_len * 2 + 1;
+        char* escaped = malloc(escaped_len);
         if(content) escape_json((const char*)content, escaped);
+        else escaped[0] = '\0';
         
-        char buf[2048];
-        snprintf(buf, sizeof(buf), "{\"id\":%d,\"sender\":%d,\"text\":\"%s\"}", id, sender, escaped);
-        if (strlen(res) + strlen(buf) < 8000) strcat(res, buf);
+        size_t item_size = strlen(escaped) + 128;
+        char* buf = malloc(item_size);
+        snprintf(buf, item_size, "{\"id\":%d,\"sender\":%d,\"text\":\"%s\"}", id, sender, escaped);
+        
+        size_t buf_len = strlen(buf);
+        if (len + buf_len + 2 > cap) {
+            cap *= 2;
+            if (cap < len + buf_len + 2) cap = len + buf_len + 2;
+            res = realloc(res, cap);
+        }
+        
+        if (!first) { strcat(res, ","); len++; }
+        first = 0;
+        strcat(res, buf);
+        len += buf_len;
+        
+        free(buf);
+        free(escaped);
     }
     strcat(res, "]");
     return res;
@@ -153,13 +171,13 @@ char* db_get_messages_admin(int user_id, int after_msg_id) {
 
 char* db_get_users() {
     sqlite3_stmt *stmt;
-    char *res = malloc(8192);
+    size_t cap = 8192;
+    char *res = malloc(cap);
     strcpy(res, "[");
+    size_t len = 1;
     if (sqlite3_prepare_v2(db, "SELECT id, first_name, surname, phone FROM users", -1, &stmt, NULL) == SQLITE_OK) {
         int first = 1;
         while (sqlite3_step(stmt) == SQLITE_ROW) {
-            if (!first) strcat(res, ",");
-            first = 0;
             int id = sqlite3_column_int(stmt, 0);
             const unsigned char* fn = sqlite3_column_text(stmt, 1);
             const unsigned char* sn = sqlite3_column_text(stmt, 2);
@@ -172,7 +190,18 @@ char* db_get_users() {
             
             char buf[1024];
             snprintf(buf, sizeof(buf), "{\"id\":%d,\"name\":\"%s %s\",\"phone\":\"%s\"}", id, e_fn, e_sn, e_ph);
-            if (strlen(res) + strlen(buf) < 8000) strcat(res, buf);
+            
+            size_t buf_len = strlen(buf);
+            if (len + buf_len + 2 > cap) {
+                cap *= 2;
+                if (cap < len + buf_len + 2) cap = len + buf_len + 2;
+                res = realloc(res, cap);
+            }
+            
+            if (!first) { strcat(res, ","); len++; }
+            first = 0;
+            strcat(res, buf);
+            len += buf_len;
         }
         sqlite3_finalize(stmt);
     }

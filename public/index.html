@@ -77,7 +77,7 @@
         <div class="chat-input-area">
             <input type="text" id="msg" placeholder="اكتب رسالتك هنا..." onkeypress="handleKey(event)"
                 oninput="resetTimer()">
-            <input type="file" id="file-upload" accept="*/*" style="display: none;" onchange="prepareFile(this)">
+            <input type="file" id="file-upload" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt" style="display: none;" onchange="prepareFile(this)">
             <button class="icon-btn" onclick="document.getElementById('file-upload').click()"
                 title="إرفاق ملف">📎</button>
 
@@ -233,10 +233,14 @@
             inp.value = '';
 
             try {
-                await fetch('/api/send', {
+                const res = await fetch('/api/send', {
                     method: 'POST',
                     body: JSON.stringify({ token: token, msg: text })
                 });
+                const data = await res.json();
+                if (data.error) {
+                    alert(data.error);
+                }
             } catch (e) {
                 console.error("Send error", e);
             }
@@ -248,6 +252,12 @@
         function prepareFile(input) {
             if (!input.files || input.files.length === 0) return;
             pendingFile = input.files[0];
+            if (pendingFile.type && pendingFile.type.startsWith('video/')) {
+                alert("عذراً، لا يمكن إرسال مقاطع فيديو.");
+                input.value = '';
+                pendingFile = null;
+                return;
+            }
             document.getElementById('confirm-filename').innerText = pendingFile.name;
             document.getElementById('confirm-modal').style.display = 'flex';
             input.value = ''; // Reset input to allow selecting same file again
@@ -273,10 +283,18 @@
                 box.innerHTML += `<div class="msg me" style="opacity:0.6">جاري الإرسال...</div>`;
                 box.scrollTop = box.scrollHeight;
 
-                await fetch('/api/send', {
-                    method: 'POST',
-                    body: JSON.stringify({ token: token, msg: b64 })
-                });
+                try {
+                    const res = await fetch('/api/send', {
+                        method: 'POST',
+                        body: JSON.stringify({ token: token, msg: b64 })
+                    });
+                    const data = await res.json();
+                    if (data.error) {
+                        alert(data.error);
+                    }
+                } catch (e) {
+                    console.error("Send error", e);
+                }
                 resetTimer();
                 pollMessages();
             };
