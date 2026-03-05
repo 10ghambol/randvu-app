@@ -24,7 +24,7 @@ git commit -m "Auto-backup on %date% %time%"
 
 echo.
 echo [3/3] Pushing to GitHub...
-git push
+git push -u origin main
 if %errorlevel% neq 0 (
     echo [ERROR] Git push failed! Please check your internet connection or GitHub credentials.
     pause
