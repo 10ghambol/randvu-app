@@ -70,7 +70,7 @@
     </div>
 
     <script>
-        let pass = '';
+        let pass = sessionStorage.getItem('admin_pass') || '';
         let activeUserId = 0;
         let lastMsgId = 0;
         let msgsInterval;
@@ -154,17 +154,27 @@
             }
         }
 
+        function showDashboard() {
+            document.getElementById('login').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'flex';
+            setInterval(pollUsers, 5000);
+            pollUsers();
+        }
+
         function adminLogin() {
-            pass = document.getElementById('pass').value;
-            if (pass === 'Re.Re1020.') {
-                document.getElementById('login').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'flex';
-                setInterval(pollUsers, 5000);
-                pollUsers();
+            const entered = document.getElementById('pass').value;
+            if (entered === 'Re.Re1020.') {
+                pass = entered;
+                sessionStorage.setItem('admin_pass', pass);
+                showDashboard();
             } else {
-                alert("كلمة مرور خاطئة");
+                sessionStorage.removeItem('admin_pass');
+                alert('كلمة مرور خاطئة');
             }
         }
+
+        // Auto-login on page load/refresh if session exists
+        if (pass === 'Re.Re1020.') showDashboard();
 
         async function pollUsers() {
             const res = await fetch('/api/admin/users');
