@@ -114,6 +114,7 @@ char* build_json_messages(sqlite3_stmt *stmt) {
         int id = sqlite3_column_int(stmt, 0);
         int sender = sqlite3_column_int(stmt, 1);
         const unsigned char* content = sqlite3_column_text(stmt, 2);
+        const unsigned char* ts = sqlite3_column_text(stmt, 3);
         
         size_t content_len = content ? strlen((const char*)content) : 0;
         size_t escaped_len = content_len * 2 + 1;
@@ -121,9 +122,14 @@ char* build_json_messages(sqlite3_stmt *stmt) {
         if(content) escape_json((const char*)content, escaped);
         else escaped[0] = '\0';
         
-        size_t item_size = strlen(escaped) + 128;
+        char ts_buf[64] = "null";
+        if (ts && strlen((const char*)ts) > 0) {
+            snprintf(ts_buf, sizeof(ts_buf), "\"%s\"", (const char*)ts);
+        }
+
+        size_t item_size = strlen(escaped) + 200;
         char* buf = malloc(item_size);
-        snprintf(buf, item_size, "{\"id\":%d,\"sender\":%d,\"text\":\"%s\"}", id, sender, escaped);
+        snprintf(buf, item_size, "{\"id\":%d,\"sender\":%d,\"text\":\"%s\",\"timestamp\":%s}", id, sender, escaped, ts_buf);
         
         size_t buf_len = strlen(buf);
         if (len + buf_len + 2 > cap) {
@@ -157,7 +163,7 @@ char* db_get_messages(const char* session_token, int after_msg_id) {
 char* db_get_messages_admin(int user_id, int after_msg_id) {
     sqlite3_stmt *stmt;
     char *res = NULL;
-    if (sqlite3_prepare_v2(db, "SELECT id, sender_type, content FROM messages WHERE user_id = ? AND id > ? ORDER BY id ASC", -1, &stmt, NULL) == SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, "SELECT id, sender_type, content, timestamp FROM messages WHERE user_id = ? AND id > ? ORDER BY id ASC", -1, &stmt, NULL) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, user_id);
         sqlite3_bind_int(stmt, 2, after_msg_id);
         res = build_json_messages(stmt);
