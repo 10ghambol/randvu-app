@@ -261,6 +261,8 @@ button:active {
     padding: 10px 15px;
     border-radius: 18px;
     word-wrap: break-word;
+    word-break: break-word;
+    white-space: pre-wrap;
     font-size: 14px;
     line-height: 1.65;
     position: relative;
