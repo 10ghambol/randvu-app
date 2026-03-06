@@ -41,7 +41,12 @@
 
     <div id="dashboard" style="display:none;">
         <div class="users-list" id="users-list">
-            <h3>المرضى</h3>
+            <h3>
+                <span>المرضى</span>
+                <button onclick="adminLogout()"
+                    style="width:auto;padding:4px 10px;font-size:11px;background:#e74c3c;box-shadow:none;border-radius:8px;">خروج
+                    ✕</button>
+            </h3>
             <div id="users-container"></div>
         </div>
         <div class="chat-container admin-chat">
@@ -195,6 +200,11 @@
                 sessionStorage.removeItem('admin_pass');
                 alert('كلمة مرور خاطئة');
             }
+        }
+
+        function adminLogout() {
+            sessionStorage.removeItem('admin_pass');
+            location.reload();
         }
 
         // Auto-login on page load/refresh if session exists
