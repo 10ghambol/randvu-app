@@ -244,19 +244,35 @@ void* handle_client(void* arg) {
         }
     } else if (strcmp(method, "POST") == 0 && body) {
         if (strcmp(path, "/api/login") == 0) {
-            char fname[128]="", sname[128]="", phone[128]="";
+            char fname[128]="", sname[128]="", phone[128]="", req_type[128]="";
             get_json_string(body, "first_name", fname, sizeof(fname));
             get_json_string(body, "surname", sname, sizeof(sname));
             get_json_string(body, "phone", phone, sizeof(phone));
+            get_json_string(body, "req_type", req_type, sizeof(req_type));
             
             char token[128];
             if (db_create_user(fname, sname, phone, token)) {
                 char res[256];
                 snprintf(res, sizeof(res), "{\"token\":\"%s\"}", token);
                 send_response(client_sock, HTTP_200, "application/json", res);
+
+                // Auto-message from doctor for hospital booking
+                if (strstr(req_type, "\xd8\xad\xd8\xac\xd8\xb2 \xd9\x85\xd9\x88\xd8\xb9\xd8\xaf \xd9\x85\xd8\xb4\xd9\x81\xd9\x89") != NULL) {
+                    int uid = get_user_id_by_token(token);
+                    if (uid != -1) {
+                        const char* auto_msg =
+                            "\xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7\xd8\x8c \xd9\x84\xd8\xa3\xd8\xaa\xd9\x85\xd8\xa7\xd9\x85 \xd8\xad\xd8\xac\xd8\xb2 \xd8\xa7\xd9\x84\xd9\x85\xd8\xb3\xd8\xaa\xd8\xb4\xd9\x81\xd9\x89\xd8\x8c \xd9\x8a\xd8\xb1\xd8\xac\xd9\x89 \xd8\xa5\xd8\xb1\xd8\xb3\xd8\xa7\xd9\x84 \xd8\xa7\xd9\x84\xd9\x85\xd8\xb9\xd9\x84\xd9\x88\xd9\x85\xd8\xa7\xd8\xaa \xd8\xa7\xd9\x84\xd8\xaa\xd8\xa7\xd9\x84\xd9\x8a\xd8\xa9 \xd8\xa8\xd8\xa7\xd9\x84\xd8\xaa\xd8\xb1\xd8\xaa\xd9\x8a\xd8\xa8:\n"
+                            "1\xef\xb8\x8f\xe2\x83\xa3 \xd8\xb5\xd9\x88\xd8\xb1\xd8\xa9 \xd8\xa7\xd9\x84\xd9\x83\xd9\x85\xd9\x84\xd9\x83\n"
+                            "2\xef\xb8\x8f\xe2\x83\xa3 \xd8\xa7\xd8\xb3\xd9\x85 \xd8\xa7\xd9\x84\xd9\x88\xd9\x84\xd8\xa7\xd9\x8a\xd8\xa9\n"
+                            "3\xef\xb8\x8f\xe2\x83\xa3 \xd8\xa7\xd8\xb3\xd9\x85 \xd8\xa7\xd9\x84\xd9\x85\xd8\xb3\xd8\xaa\xd8\xb4\xd9\x81\xd9\x89\n"
+                            "4\xef\xb8\x8f\xe2\x83\xa3 \xd8\xa7\xd8\xb3\xd9\x85 \xd8\xa7\xd9\x84\xd9\x82\xd8\xb3\xd9\x85";
+                        db_save_message_admin(uid, auto_msg);
+                    }
+                }
             } else {
                 write(client_sock, HTTP_500, strlen(HTTP_500));
             }
+
         } else if (strcmp(path, "/api/send") == 0) {
             char token[128]="";
             char *msg = malloc(BUFFER_SIZE);
