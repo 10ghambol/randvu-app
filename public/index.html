@@ -6,9 +6,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Randvu - منصة الاستشارات الطبية</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* ===== Business Hours Modal ===== */
+        #hours-modal .modal-content {
+            padding: 2.5rem 2rem;
+            max-width: 380px;
+        }
+
+        .hours-icon {
+            font-size: 56px;
+            margin-bottom: 12px;
+            display: block;
+            animation: swingClock 1.8s ease-in-out infinite;
+        }
+
+        @keyframes swingClock {
+
+            0%,
+            100% {
+                transform: rotate(-8deg);
+            }
+
+            50% {
+                transform: rotate(8deg);
+            }
+        }
+
+        .hours-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #c0392b;
+            margin-bottom: 8px;
+        }
+
+        .hours-body {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+
+        .hours-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #2e86c1, #1a5276);
+            color: white;
+            border-radius: 12px;
+            padding: 8px 20px;
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 18px;
+            letter-spacing: 0.5px;
+        }
+
+        #hours-modal .close-btn {
+            background: #e0eaf4;
+            color: #1a5276;
+            box-shadow: none;
+            font-size: 14px;
+            padding: 10px;
+        }
+
+        #hours-modal .close-btn:hover {
+            background: #ccd9e8;
+        }
+    </style>
 </head>
 
 <body>
+    <!-- Business Hours Closed Modal -->
+    <div id="hours-modal" class="modal" style="display:none;" onclick="if(event.target===this) closeHoursModal()">
+        <div class="modal-content" style="text-align:center;">
+            <span class="hours-icon">⏰</span>
+            <div class="hours-title">العيادة مغلقة حالياً</div>
+            <p class="hours-body">
+                نعتذر عن التواصل خارج أوقات العمل.
+                يمكنك التواصل معنا خلال:
+            </p>
+            <div class="hours-badge">الإثنين – الجمعة &nbsp;|&nbsp; 10:00 – 17:00</div>
+            <p class="hours-body" style="margin-bottom:20px;font-size:13px;">توقيت تركيا (UTC+3)</p>
+            <button class="close-btn" onclick="closeHoursModal()">حسناً، سأعود لاحقاً ✕</button>
+        </div>
+    </div>
+
     <div id="welcome-screen" class="container">
         <div class="logo-header">
             <h1 style="margin: 0;">Randvu Medical</h1>
@@ -158,7 +237,25 @@
             }
         }
 
-        function showModal() { document.getElementById('fee-modal').style.display = 'flex'; }
+        // Check business hours: Mon-Fri 10:00-17:00 Turkey (UTC+3)
+        function isBusinessHours() {
+            const now = new Date();
+            const turkeyOffset = 3 * 60; // UTC+3 in minutes
+            const localOffset = now.getTimezoneOffset();
+            const turkey = new Date(now.getTime() + (turkeyOffset + localOffset) * 60000);
+            const day = turkey.getDay();   // 0=Sun, 6=Sat
+            const hour = turkey.getHours();
+            return day >= 1 && day <= 5 && hour >= 10 && hour < 17;
+        }
+
+        function showModal() {
+            if (!isBusinessHours()) {
+                document.getElementById('hours-modal').style.display = 'flex';
+                return;
+            }
+            document.getElementById('fee-modal').style.display = 'flex';
+        }
+        function closeHoursModal() { document.getElementById('hours-modal').style.display = 'none'; }
         function hideModal() { document.getElementById('fee-modal').style.display = 'none'; }
         function showForm() {
             hideModal();

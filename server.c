@@ -109,9 +109,14 @@ void get_json_string(const char* json, const char* key, char* out, size_t out_si
 }
 
 // Check if currently within Business Hours (Mon-Fri, 10:00 - 17:00, Turkey Time UTC+3)
-// NOTE: Temporarily returns 1 always for testing purposes.
 int is_business_hours() {
-    return 1; // TESTING MODE: always open
+    time_t rawtime;
+    time(&rawtime);
+    time_t turkey_time = rawtime + (3 * 3600);
+    struct tm *info = gmtime(&turkey_time);
+    if (info->tm_wday == 0 || info->tm_wday == 6) return 0; // Weekend
+    if (info->tm_hour >= 10 && info->tm_hour < 17) return 1;
+    return 0;
 }
 
 void send_response(int client_sock, const char* header_tpl, const char* content_type, const char* body) {
