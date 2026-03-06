@@ -312,6 +312,21 @@
             return String(str).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
         }
 
+        // Format timestamp as Turkey time (UTC+3) in 12-hour format with Arabic AM/PM
+        // SQLite CURRENT_TIMESTAMP is in UTC as "YYYY-MM-DD HH:MM:SS"
+        function formatTurkeyTime(ts) {
+            if (!ts) return '';
+            // Append 'Z' to force browser to treat as UTC
+            const d = new Date(ts.replace(' ', 'T') + 'Z');
+            if (isNaN(d)) return '';
+            const utcH = d.getUTCHours();
+            const utcM = d.getUTCMinutes();
+            const trH = (utcH + 3) % 24; // UTC+3 Turkey
+            const period = trH < 12 ? 'ص' : 'م';
+            const h12 = trH === 0 ? 12 : trH > 12 ? trH - 12 : trH;
+            return `${String(h12).padStart(2, '0')}:${String(utcM).padStart(2, '0')} ${period}`;
+        }
+
         function getAudioCtx() {
             if (!audioCtx || audioCtx.state === 'closed') {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -504,12 +519,10 @@
                         isText = false;
                     }
 
-                    const timeStr = m.timestamp
-                        ? toLatinNums(new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Europe/Istanbul' })).replace('AM', 'ص').replace('PM', 'م')
-                        : '';
+                    const timeStr = m.timestamp ? formatTurkeyTime(m.timestamp) : '';
                     const timeHtml = timeStr ? `<span style="font-size: 10px; opacity: 0.7; margin-right: 10px; float: left;">${timeStr}</span>` : '';
                     const copyAction = isText ? `onclick="copyText(this)" title="انقر لنسخ النص" style="cursor: pointer;"` : '';
-                    const msgText = isText ? toLatinNums(content) : content;
+                    const msgText = isText ? toLatinNums(content).replace(/\n/g, '<br>') : content;
 
                     box.innerHTML += `<div class="msg ${m.sender === 0 ? 'me' : 'them'}" ${copyAction}>${msgText}${timeHtml}<div style="clear:both;"></div></div>`;
                 });
