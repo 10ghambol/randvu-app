@@ -69,6 +69,97 @@
         #hours-modal .close-btn:hover {
             background: #ccd9e8;
         }
+
+        /* ===== Payment Modal ===== */
+        #payment-modal .modal-content {
+            padding: 2rem 1.6rem;
+            max-width: 360px;
+            text-align: center;
+        }
+
+        .pay-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .pay-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #1a5276;
+            margin-bottom: 18px;
+        }
+
+        .pay-field {
+            background: #f0f6fc;
+            border: 1px solid #ccd9e8;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+            text-align: right;
+        }
+
+        .pay-field label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #5d7a96;
+            display: block;
+            margin-bottom: 5px;
+            letter-spacing: 0.4px;
+        }
+
+        .pay-field-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .pay-field-value {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1a252f;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+            word-break: break-all;
+            flex: 1;
+        }
+
+        .copy-btn {
+            background: linear-gradient(135deg, #2e86c1, #1a5276);
+            color: white;
+            border: none;
+            border-radius: 7px;
+            padding: 6px 13px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: opacity 0.2s;
+            width: auto;
+            margin: 0;
+        }
+
+        .copy-btn:hover {
+            opacity: 0.85;
+        }
+
+        .copy-btn.copied {
+            background: #27ae60;
+        }
+
+        #payment-modal .close-btn {
+            background: #e0eaf4;
+            color: #1a5276;
+            box-shadow: none;
+            font-size: 14px;
+            padding: 10px;
+            margin-top: 6px;
+        }
+
+        #payment-modal .close-btn:hover {
+            background: #ccd9e8;
+        }
     </style>
 </head>
 
@@ -85,6 +176,32 @@
             <div class="hours-badge">من الإثنين إلى الجمعة<br>من 10:00 صباحاً حتى 05:00 عصراً</div>
             <p class="hours-body" style="margin-bottom:20px;font-size:13px;">توقيت تركيا (UTC+3)</p>
             <button class="close-btn" onclick="closeHoursModal()">حسناً، سأعود لاحقاً ✕</button>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal" style="display:none;" onclick="if(event.target===this) closePaymentModal()">
+        <div class="modal-content">
+            <span class="pay-icon">🏦</span>
+            <div class="pay-title">الدفع عبر البنك التركي</div>
+
+            <div class="pay-field">
+                <label>رقم IBAN</label>
+                <div class="pay-field-row">
+                    <span class="pay-field-value" id="iban-value">TR 8400 0100 1781 9240 6022 5001</span>
+                    <button class="copy-btn" onclick="copyField('iban-value', this)">نسخ</button>
+                </div>
+            </div>
+
+            <div class="pay-field">
+                <label>الاسم</label>
+                <div class="pay-field-row">
+                    <span class="pay-field-value" id="name-value">RIZA ALSAID RAMADAN</span>
+                    <button class="copy-btn" onclick="copyField('name-value', this)">نسخ</button>
+                </div>
+            </div>
+
+            <button class="close-btn" onclick="closePaymentModal()">إغلاق ✕</button>
         </div>
     </div>
 
@@ -153,8 +270,12 @@
         style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; max-width:700px; margin:auto; border-radius:0;">
         <div class="chat-header" style="display: flex; justify-content: space-between; align-items: center;">
             <span>محادثة مباشرة مع الطبيب</span>
-            <button onclick="manualLogout()"
-                style="width: auto; padding: 6px 12px; font-size: 12px; background: #e74c3c;">إنهاء الجلسة</button>
+            <div style="display:flex; gap:6px;">
+                <button onclick="document.getElementById('payment-modal').style.display='flex'"
+                    style="width:auto; padding:6px 12px; font-size:12px; background:#1a7fd4;">💳 طريقة الدفع</button>
+                <button onclick="manualLogout()"
+                    style="width: auto; padding: 6px 12px; font-size: 12px; background: #e74c3c;">إنهاء الجلسة</button>
+            </div>
         </div>
         <div id="chat-box" class="chat-box"></div>
         <div class="chat-input-area">
@@ -384,7 +505,7 @@
                     }
 
                     const timeStr = m.timestamp
-                        ? toLatinNums(new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }))
+                        ? toLatinNums(new Date(m.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Istanbul' }))
                         : '';
                     const timeHtml = timeStr ? `<span style="font-size: 10px; opacity: 0.7; margin-right: 10px; float: left;">${timeStr}</span>` : '';
                     const copyAction = isText ? `onclick="copyText(this)" title="انقر لنسخ النص" style="cursor: pointer;"` : '';
@@ -491,6 +612,22 @@
 
         function closeImageModal() {
             document.getElementById('image-modal').style.display = 'none';
+        }
+
+        function closePaymentModal() {
+            document.getElementById('payment-modal').style.display = 'none';
+        }
+
+        function copyField(id, btn) {
+            const text = document.getElementById(id).innerText;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    const orig = btn.textContent;
+                    btn.textContent = '✔ تم';
+                    btn.classList.add('copied');
+                    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+                });
+            }
         }
 
         function copyText(element) {
